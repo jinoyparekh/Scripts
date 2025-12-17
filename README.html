@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure GitLab CI Secrets Pipeline | AWS GovCloud</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Work+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #0a0e1a;
+            --color-surface: #151b2e;
+            --color-surface-elevated: #1e2739;
+            --color-primary: #00d4aa;
+            --color-secondary: #4f46e5;
+            --color-accent: #f59e0b;
+            --color-text: #e2e8f0;
+            --color-text-dim: #94a3b8;
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-border: #2d3748;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-sans: 'Work Sans', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(0, 212, 170, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(79, 70, 229, 0.06) 0%, transparent 50%);
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, -20px); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            color: white;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            border-radius: 2rem;
+            margin-bottom: 2rem;
+            animation: fadeInUp 1s ease-out 0.2s both;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--color-text) 0%, var(--color-primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeInUp 1s ease-out 0.4s both;
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            color: var(--color-text-dim);
+            max-width: 600px;
+            margin-bottom: 3rem;
+            animation: fadeInUp 1s ease-out 0.6s both;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 4rem;
+            animation: fadeInUp 1s ease-out 0.8s both;
+        }
+
+        .stat-card {
+            background: var(--color-surface);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            border: 1px solid var(--color-border);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--color-primary);
+            box-shadow: 0 10px 30px rgba(0, 212, 170, 0.1);
+        }
+
+        .stat-number {
+            font-family: var(--font-mono);
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--color-text-dim);
+            font-size: 0.875rem;
+        }
+
+        /* Section */
+        section {
+            padding: 6rem 0;
+            position: relative;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 3rem;
+            position: relative;
+            display: inline-block;
+        }
+
+        h2::after {
+            content: '';
+            position: absolute;
+            bottom: -0.5rem;
+            left: 0;
+            width: 60%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--color-primary), transparent);
+        }
+
+        /* Architecture Diagram */
+        .architecture {
+            background: var(--color-surface);
+            padding: 3rem;
+            border-radius: 1.5rem;
+            border: 1px solid var(--color-border);
+            margin: 3rem 0;
+        }
+
+        .flow-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 2rem;
+        }
+
+        .flow-step {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+            position: relative;
+        }
+
+        .flow-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            background: var(--color-surface-elevated);
+            border: 2px solid var(--color-primary);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .flow-step:hover .flow-icon {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(0, 212, 170, 0.3);
+        }
+
+        .flow-label {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--color-text);
+        }
+
+        .flow-desc {
+            font-size: 0.75rem;
+            color: var(--color-text-dim);
+            margin-top: 0.5rem;
+        }
+
+        .flow-arrow {
+            color: var(--color-primary);
+            font-size: 2rem;
+            flex-shrink: 0;
+        }
+
+        /* Phases */
+        .phase-list {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .phase {
+            background: var(--color-surface);
+            padding: 2rem;
+            border-radius: 1rem;
+            border-left: 4px solid var(--color-border);
+            transition: all 0.3s ease;
+        }
+
+        .phase.complete {
+            border-left-color: var(--color-success);
+        }
+
+        .phase:hover {
+            transform: translateX(8px);
+            box-shadow: -4px 0 20px rgba(0, 212, 170, 0.1);
+        }
+
+        .phase-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .phase-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .phase-status {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+        }
+
+        .phase-status.complete {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--color-success);
+        }
+
+        .phase-status.next {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--color-warning);
+        }
+
+        .phase-desc {
+            color: var(--color-text-dim);
+            margin-bottom: 1rem;
+        }
+
+        .phase-tech {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .tech-tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            background: var(--color-surface-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: 0.5rem;
+            color: var(--color-text-dim);
+        }
+
+        /* Roadmap */
+        .roadmap {
+            background: var(--color-surface);
+            padding: 3rem;
+            border-radius: 1.5rem;
+            border: 1px solid var(--color-border);
+        }
+
+        .roadmap-item {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .roadmap-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .roadmap-item::before {
+            content: '';
+            position: absolute;
+            left: 1.5rem;
+            top: 3rem;
+            bottom: -3rem;
+            width: 2px;
+            background: var(--color-border);
+        }
+
+        .roadmap-item:last-child::before {
+            display: none;
+        }
+
+        .roadmap-number {
+            width: 3rem;
+            height: 3rem;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .roadmap-content h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--color-text);
+        }
+
+        .roadmap-content p {
+            color: var(--color-text-dim);
+            margin-bottom: 1rem;
+        }
+
+        .roadmap-features {
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--color-surface-elevated);
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .feature-item:hover {
+            background: var(--color-bg);
+        }
+
+        .feature-icon {
+            color: var(--color-primary);
+            flex-shrink: 0;
+            margin-top: 0.125rem;
+        }
+
+        .feature-text {
+            font-size: 0.875rem;
+            color: var(--color-text-dim);
+        }
+
+        /* Highlights */
+        .highlights {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .highlight-card {
+            background: var(--color-surface);
+            padding: 2rem;
+            border-radius: 1rem;
+            border: 1px solid var(--color-border);
+            transition: all 0.3s ease;
+        }
+
+        .highlight-card:hover {
+            border-color: var(--color-primary);
+            box-shadow: 0 10px 40px rgba(0, 212, 170, 0.1);
+        }
+
+        .highlight-icon {
+            width: 3rem;
+            height: 3rem;
+            background: rgba(0, 212, 170, 0.1);
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .highlight-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            color: var(--color-text);
+        }
+
+        .highlight-card p {
+            color: var(--color-text-dim);
+            font-size: 0.875rem;
+        }
+
+        /* CTA */
+        .cta {
+            text-align: center;
+            padding: 6rem 0;
+            background: linear-gradient(135deg, var(--color-surface), var(--color-bg));
+        }
+
+        .cta h2 {
+            margin-bottom: 1.5rem;
+        }
+
+        .cta p {
+            color: var(--color-text-dim);
+            font-size: 1.125rem;
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            color: white;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 0.75rem;
+            transition: all 0.3s ease;
+            font-size: 1.125rem;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 212, 170, 0.3);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem 0;
+            color: var(--color-text-dim);
+            font-size: 0.875rem;
+            border-top: 1px solid var(--color-border);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            h2 {
+                font-size: 2rem;
+            }
+
+            .flow-container {
+                flex-direction: column;
+            }
+
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Scroll animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <div class="hero">
+        <div class="container hero-content">
+            <div class="badge">AWS GovCloud • FedRAMP Ready</div>
+            <h1>Zero-Trust Secret Management<br>for GitLab CI/CD</h1>
+            <p class="subtitle">Production-grade IRSA pipeline eliminating long-lived credentials and enabling secure, compliant CI/CD workflows in AWS EKS.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">0</div>
+                    <div class="stat-label">Long-Lived Keys</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">5</div>
+                    <div class="stat-label">Phases Complete</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">IRSA Compliant</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">Days to MVP</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Architecture Section -->
+    <section>
+        <div class="container">
+            <h2 class="fade-in">Architecture Overview</h2>
+            
+            <div class="architecture fade-in">
+                <div class="flow-container">
+                    <div class="flow-step">
+                        <div class="flow-icon">🔐</div>
+                        <div class="flow-label">AWS Secrets Manager</div>
+                        <div class="flow-desc">Source of truth</div>
+                    </div>
+                    
+                    <div class="flow-arrow">→</div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-icon">⚡</div>
+                        <div class="flow-label">External Secrets Operator</div>
+                        <div class="flow-desc">IRSA-enabled sync</div>
+                    </div>
+                    
+                    <div class="flow-arrow">→</div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-icon">☸️</div>
+                        <div class="flow-label">Kubernetes Secret</div>
+                        <div class="flow-desc">gitlab-runner namespace</div>
+                    </div>
+                    
+                    <div class="flow-arrow">→</div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-icon">🚀</div>
+                        <div class="flow-label">GitLab CI Job</div>
+                        <div class="flow-desc">Secure volume mount</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlights">
+                <div class="highlight-card fade-in">
+                    <div class="highlight-icon">🛡️</div>
+                    <h3>Zero Long-Lived Keys</h3>
+                    <p>IRSA provides temporary credentials via ServiceAccount tokens. No static keys, no rotation burden, no security drift.</p>
+                </div>
+                <div class="highlight-card fade-in">
+                    <div class="highlight-icon">🎯</div>
+                    <h3>Least Privilege</h3>
+                    <p>IAM policies scoped to gitlab/* paths only. ServiceAccount binding prevents lateral movement across namespaces.</p>
+                </div>
+                <div class="highlight-card fade-in">
+                    <div class="highlight-icon">📋</div>
+                    <h3>Audit Ready</h3>
+                    <p>All secret access logged via CloudTrail. ESO sync events tracked. FedRAMP High compliance groundwork complete.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- What We Built Section -->
+    <section style="background: var(--color-surface-elevated);">
+        <div class="container">
+            <h2 class="fade-in">What We Built</h2>
+            
+            <div class="phase-list">
+                <div class="phase complete fade-in">
+                    <div class="phase-header">
+                        <div class="phase-title">
+                            <span>✓</span>
+                            Phase 1: Ground Truth
+                        </div>
+                        <div class="phase-status complete">COMPLETE</div>
+                    </div>
+                    <div class="phase-desc">
+                        Mapped the terrain: identified job pod namespace (gitlab-runner), ESO ServiceAccount (external-secrets), and validated cluster topology.
+                    </div>
+                    <div class="phase-tech">
+                        <span class="tech-tag">kubectl</span>
+                        <span class="tech-tag">k9s</span>
+                        <span class="tech-tag">namespace-scoping</span>
+                    </div>
+                </div>
+
+                <div class="phase complete fade-in">
+                    <div class="phase-header">
+                        <div class="phase-title">
+                            <span>✓</span>
+                            Phase 2: IRSA Binding
+                        </div>
+                        <div class="phase-status complete">COMPLETE</div>
+                    </div>
+                    <div class="phase-desc">
+                        Wired OIDC provider, created IAM role with gitlab/* access, bound to ESO ServiceAccount. Verified trust policy locks to correct sub/aud.
+                    </div>
+                    <div class="phase-tech">
+                        <span class="tech-tag">eksctl</span>
+                        <span class="tech-tag">IAM policy</span>
+                        <span class="tech-tag">OIDC trust</span>
+                        <span class="tech-tag">ServiceAccount annotation</span>
+                    </div>
+                </div>
+
+                <div class="phase complete fade-in">
+                    <div class="phase-header">
+                        <div class="phase-title">
+                            <span>✓</span>
+                            Phase 3: IRSA Proof
+                        </div>
+                        <div class="phase-status complete">COMPLETE</div>
+                    </div>
+                    <div class="phase-desc">
+                        Ran test pod with ESO ServiceAccount, confirmed STS assumed-role identity. Identity chain validated before ESO config.
+                    </div>
+                    <div class="phase-tech">
+                        <span class="tech-tag">boto3</span>
+                        <span class="tech-tag">sts:GetCallerIdentity</span>
+                        <span class="tech-tag">pod-level-testing</span>
+                    </div>
+                </div>
+
+                <div class="phase complete fade-in">
+                    <div class="phase-header">
+                        <div class="phase-title">
+                            <span>✓</span>
+                            Phase 4: ESO Sync
+                        </div>
+                        <div class="phase-status complete">COMPLETE</div>
+                    </div>
+                    <div class="phase-desc">
+                        Created ClusterSecretStore, deployed ExternalSecret to gitlab-runner namespace. Verified K8s Secret exists and syncs from Secrets Manager.
+                    </div>
+                    <div class="phase-tech">
+                        <span class="tech-tag">ClusterSecretStore</span>
+                        <span class="tech-tag">ExternalSecret</span>
+                        <span class="tech-tag">property-mapping</span>
+                    </div>
+                </div>
+
+                <div class="phase complete fade-in">
+                    <div class="phase-header">
+                        <div class="phase-title">
+                            <span>✓</span>
+                            Phase 5: CI Integration
+                        </div>
+                        <div class="phase-status complete">COMPLETE</div>
+                    </div>
+                    <div class="phase-desc">
+                        Configured runner to mount secret as read-only volume at /run/secrets/gitlab. CI job verified file access, validated SHA256 hash. Zero leaks.
+                    </div>
+                    <div class="phase-tech">
+                        <span class="tech-tag">GitLab runner config</span>
+                        <span class="tech-tag">volume mount</span>
+                        <span class="tech-tag">hash validation</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Roadmap Section -->
+    <section>
+        <div class="container">
+            <h2 class="fade-in">Production Roadmap</h2>
+            <p class="subtitle fade-in" style="margin-bottom: 3rem;">From MVP to FedRAMP High compliant, multi-tenant platform.</p>
+            
+            <div class="roadmap fade-in">
+                <div class="roadmap-item">
+                    <div class="roadmap-number">1</div>
+                    <div class="roadmap-content">
+                        <h3>Multi-Tenant Secret Isolation</h3>
+                        <p>Namespace-per-customer architecture with dedicated IAM roles and path-restricted policies.</p>
+                        <div class="roadmap-features">
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Separate IAM roles per customer: customer-a/* → Role A, customer-b/* → Role B</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">ExternalSecret per namespace, ClusterSecretStore referencing correct SA</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">RBAC prevents cross-namespace ServiceAccount token projection</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="roadmap-item">
+                    <div class="roadmap-number">2</div>
+                    <div class="roadmap-content">
+                        <h3>RBAC & Network Hardening</h3>
+                        <p>Eliminate cluster-admin, enforce least privilege, isolate customer workloads.</p>
+                        <div class="roadmap-features">
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Granular RBAC per ServiceAccount (no wildcards, explicit resource names)</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">NetworkPolicies: deny-all default, explicit allow rules per customer namespace</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Job pods run unprivileged, no hostPath mounts, readOnlyRootFilesystem</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="roadmap-item">
+                    <div class="roadmap-number">3</div>
+                    <div class="roadmap-content">
+                        <h3>Policy Enforcement (OPA Gatekeeper)</h3>
+                        <p>Admission control ensuring all deployments meet security baselines.</p>
+                        <div class="roadmap-features">
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Block privileged pods, enforce Pod Security Standards (restricted)</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Require resource limits/requests on all containers</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Deny hostNetwork, hostPID, hostIPC usage</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="roadmap-item">
+                    <div class="roadmap-number">4</div>
+                    <div class="roadmap-content">
+                        <h3>Ephemeral Runners</h3>
+                        <p>On-demand job pods with autoscaling, cost optimization, and blast radius reduction.</p>
+                        <div class="roadmap-features">
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Runner manager stays up, job pods spawn/terminate per job</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Fresh environment per run, no state contamination</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">HPA-based scaling tied to GitLab queue depth</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="roadmap-item">
+                    <div class="roadmap-number">5</div>
+                    <div class="roadmap-content">
+                        <h3>Observability & Audit</h3>
+                        <p>Centralized logging, metrics, and alerting for FedRAMP compliance.</p>
+                        <div class="roadmap-features">
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">EKS control plane + pod logs → CloudWatch/Splunk integration</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Prometheus + Grafana dashboards: ESO sync status, IRSA auth failures</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">PagerDuty alerts on secret sync failures, IAM permission denials</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="roadmap-item">
+                    <div class="roadmap-number">6</div>
+                    <div class="roadmap-content">
+                        <h3>Secret Rotation & GitOps</h3>
+                        <p>Automated secret lifecycle management with infrastructure as code.</p>
+                        <div class="roadmap-features">
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Secrets Manager auto-rotation policies per customer</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">ESO manifests in Git (ArgoCD/Flux), drift detection</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Terraform/Pulumi for IAM roles, OIDC, Secrets Manager setup</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="roadmap-item">
+                    <div class="roadmap-number">7</div>
+                    <div class="roadmap-content">
+                        <h3>FedRAMP High Hardening</h3>
+                        <p>Final compliance controls for authorization boundary and continuous monitoring.</p>
+                        <div class="roadmap-features">
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Pod Security Admission (restricted), image scanning (Trivy/Anchore)</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">Signed images only (Cosign/Notary), immutable infrastructure (no SSH to nodes)</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">▸</span>
+                                <span class="feature-text">SIEM integration (Splunk), KMS key rotation for Secrets Manager/EBS</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <div class="cta">
+        <div class="container">
+            <h2 class="fade-in">Ready to Scale</h2>
+            <p class="fade-in">The foundation is solid. The roadmap is clear. Let's build production-grade infrastructure that passes audit with flying colors.</p>
+            <a href="#" class="cta-button fade-in">View Technical Deep Dive</a>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>Secure GitLab CI/CD Secret Management • AWS GovCloud EKS • 2024</p>
+        </div>
+    </footer>
+
+    <script>
+        // Intersection Observer for fade-in animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.fade-in').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
