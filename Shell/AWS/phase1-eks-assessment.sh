@@ -1,22 +1,24 @@
-cat > phase1-eks-assessment.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
 # Usage:
-#   export AWS_REGION=us-gov-west-1   # or us-gov-east-1
+#   export AWS_REGION=us-gov-west-1
 #   export VPC_ID=vpc-xxxxxxxxxxxxxxxxx
 #   bash phase1-eks-assessment.sh
 
 : "${AWS_REGION:?Set AWS_REGION}"
 : "${VPC_ID:?Set VPC_ID}"
 
-AWS="aws --region $AWS_REGION"
 OUTDIR="phase1-eks-assessment-${VPC_ID}-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$OUTDIR/raw"
 
 need() {
-  command -v "$1" >/dev/null 2>&1 || { echo "Missing required command: $1"; exit 1; }
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "Missing required command: $1"
+    exit 1
+  }
 }
+
 need aws
 need jq
 
@@ -24,7 +26,7 @@ save_json() {
   local name="$1"
   shift
   echo "Collecting $name ..."
-  $AWS "$@" > "$OUTDIR/raw/${name}.json"
+  aws --region "$AWS_REGION" "$@" > "$OUTDIR/raw/${name}.json"
 }
 
 echo "Region : $AWS_REGION"
@@ -32,20 +34,29 @@ echo "VPC    : $VPC_ID"
 echo "Outdir : $OUTDIR"
 echo
 
-# Core VPC / subnet / routing / security inventory
-save_json vpc describe-vpcs --vpc-ids "$VPC_ID"
-save_json subnets describe-subnets --filters "Name=vpc-id,Values=$VPC_ID"
-save_json route_tables describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID"
-save_json security_groups describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID"
-save_json nacls describe-network-acls --filters "Name=vpc-id,Values=$VPC_ID"
-save_json igws describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID"
-save_json nat_gateways describe-nat-gateways --filter "Name=vpc-id,Values=$VPC_ID"
-save_json vpc_endpoints describe-vpc-endpoints --filters "Name=vpc-id,Values=$VPC_ID"
-save_json tgw_attachments describe-transit-gateway-attachments --filters "Name=resource-id,Values=$VPC_ID"
-save_json instances describe-instances --filters "Name=vpc-id,Values=$VPC_ID" "Name=instance-state-name,Values=pending,running,stopping,stopped"
+# Core inventory
+save_json vpc ec2 describe-vpcs --vpc-ids "$VPC_ID"
+save_json subnets ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID"
+save_json route_tables ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID"
+save_json security_groups ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID"
+save_json nacls ec2 describe-network-acls --filters "Name=vpc-id,Values=$VPC_ID"
+save_json igws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID"
+save_json nat_gateways ec2 describe-nat-gateways --filter "Name=vpc-id,Values=$VPC_ID"
+save_json vpc_endpoints ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=$VPC_ID"
+save_json tgw_attachments ec2 describe-transit-gateway-attachments --filters "Name=resource-id,Values=$VPC_ID"
+save_json instances ec2 describe-instances --filters "Name=vpc-id,Values=$VPC_ID" "Name=instance-state-name,Values=pending,running,stopping,stopped"
 
-DNS_SUPPORT=$($AWS ec2 describe-vpc-attribute --vpc-id "$VPC_ID" --attribute enableDnsSupport --query 'EnableDnsSupport.Value' --output text)
-DNS_HOSTNAMES=$($AWS ec2 describe-vpc-attribute --vpc-id "$VPC_ID" --attribute enableDnsHostnames --query 'EnableDnsHostnames.Value' --output text)
+DNS_SUPPORT=$(aws --region "$AWS_REGION" ec2 describe-vpc-attribute \
+  --vpc-id "$VPC_ID" \
+  --attribute enableDnsSupport \
+  --query 'EnableDnsSupport.Value' \
+  --output text)
+
+DNS_HOSTNAMES=$(aws --region "$AWS_REGION" ec2 describe-vpc-attribute \
+  --vpc-id "$VPC_ID" \
+  --attribute enableDnsHostnames \
+  --query 'EnableDnsHostnames.Value' \
+  --output text)
 
 REPORT="$OUTDIR/phase1-summary.txt"
 CSV="$OUTDIR/subnet-analysis.csv"
@@ -62,6 +73,7 @@ get_main_rtb() {
 
 get_rtb_for_subnet() {
   local subnet_id="$1"
+
   local explicit
   explicit=$(jq -r --arg subnet "$subnet_id" '
     .RouteTables[]
@@ -238,26 +250,17 @@ PUBLIC_IGW_COUNT=$(awk -F',' 'NR>1 && $8=="igw" {c++} END {print c+0}' "$CSV")
   if (( PRIVATE_NAT_COUNT >= 2 )); then
     echo "- GOOD: there are private/NAT-routed subnet candidates."
   elif (( PUBLIC_IGW_COUNT >= 2 )); then
-    echo "- CAUTION: usable public-routed subnet candidates exist, but private-first design may need subnet/routing changes."
+    echo "- CAUTION: public-routed subnet candidates exist; private-first design may need routing changes."
   else
-    echo "- CAUTION: no obvious private/NAT or public/IGW subnet pattern; inspect custom routing/TGW design closely."
+    echo "- CAUTION: no obvious NAT or IGW pattern; inspect custom routing/TGW design closely."
   fi
 
   if jq -e '.VpcEndpoints | length > 0' "$OUTDIR/raw/vpc_endpoints.json" >/dev/null; then
-    echo "- INFO: VPC endpoints already exist; review whether they align with a private cluster design."
+    echo "- INFO: VPC endpoints already exist; review whether they support a private EKS design."
   else
-    echo "- INFO: no VPC endpoints found; fully-private EKS will likely require additional endpoint work."
+    echo "- INFO: no VPC endpoints found; fully private EKS will likely need endpoint work."
   fi
 
-  echo
-  echo "7) NEXT QUESTIONS TO ANSWER BEFORE PHASE 2"
-  echo "------------------------------------------------------------"
-  echo "- Which 2 or 3 subnets will be reserved for the cluster and node groups?"
-  echo "- Is the cluster API endpoint private-only, or private+restricted public?"
-  echo "- Will runner jobs need outbound internet, or only approved destinations?"
-  echo "- Which registries/repos must the runners reach?"
-  echo "- Which AWS services need VPC endpoints for a fully private pattern?"
-  echo "- Are any inherited SG/NACL/TGW rules noncompliant for a runner platform?"
   echo
   echo "Files:"
   echo "- Summary: $REPORT"
@@ -265,10 +268,6 @@ PUBLIC_IGW_COUNT=$(awk -F',' 'NR>1 && $8=="igw" {c++} END {print c+0}' "$CSV")
   echo "- Raw JSON:   $OUTDIR/raw/"
 } >> "$REPORT"
 
-echo
 cat "$REPORT"
 echo
 echo "Artifacts saved under: $OUTDIR"
-EOF
-
-chmod +x phase1-eks-assessment.sh
